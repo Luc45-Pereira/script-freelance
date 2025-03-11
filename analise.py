@@ -12,17 +12,17 @@ from openpyxl.utils import get_column_letter
 def analisar_posicao():
     arquivo_entrada = "ORIGINAL.xlsx"
     if not os.path.exists(arquivo_entrada):
-        messagebox.showerror("Erro", "Arquivo ORIGINAL.xlsx nÃ£o encontrado!")
+        messagebox.showerror("Erro", "Arquivo ORIGINAL.xlsx não encontrado!")
         return
 
     # Ler as abas da planilha
-    df = pd.read_excel(arquivo_entrada, sheet_name="POSIÃ‡ÃƒO DO DIA", header=0, dtype=str)
-    df_clifor = pd.read_excel(arquivo_entrada, sheet_name="CONTROLE DE LIBERAÃ‡ÃƒO - BANNERS", header=None, dtype=str)
+    df = pd.read_excel(arquivo_entrada, sheet_name="POSIÇÃO DO DIA", header=0, dtype=str)
+    df_clifor = pd.read_excel(arquivo_entrada, sheet_name="CONTROLE DE LIBERAÇÃO - BANNERS", header=None, dtype=str)
     df_base_cliente = pd.read_excel(arquivo_entrada, sheet_name="BASE CLIENTE", header=0, dtype=str)
 
     df.columns = df.columns.str.strip()
 
-    # AtualizaÃ§Ã£o dos Ã­ndices das colunas
+    # Atualização dos índices das colunas
     colunas_posicoes = {
         "VENDEDOR": None,
         "CLIFOR": 0,
@@ -34,11 +34,11 @@ def analisar_posicao():
         "PEDIDO": 8,
         "GRUPO PRODUTO": 9,
         "PRODUTO": 10,
-        "DESCRIÃ‡ÃƒO": 11,
+        "DESCRIÇÃO": 11,
         "COR": 12,
         "QTD": 13,
         "VALOR": 14,
-        "EMISSÃƒO": 15,
+        "EMISSÃO": 15,
     }
 
     colunas_reais = {chave: df.columns[posicao] for chave, posicao in colunas_posicoes.items() if posicao is not None}
@@ -55,11 +55,11 @@ def analisar_posicao():
 
     df["OCORRENCIA"] = df.apply(
         lambda row: (
-            "DivergÃªncia de quantidade Footwear"
+            "Divergência de quantidade Footwear"
             if row[colunas_reais["GRUPO PRODUTO"]] == "Footwear" and row[colunas_reais["QTD"]] != "12"
-            else "DivergÃªncia de quantidade Apparel"
+            else "Divergência de quantidade Apparel"
             if row[colunas_reais["GRUPO PRODUTO"]] == "Apparel" and row[colunas_reais["QTD"]] != "6"
-            else "DivergÃªncia de quantidade Accessories"
+            else "Divergência de quantidade Accessories"
             if row[colunas_reais["GRUPO PRODUTO"]] == "Accessories" and row[colunas_reais["QTD"]] not in ["3", "4", "5", "6"]
             else ""
         ),
@@ -74,7 +74,7 @@ def analisar_posicao():
 
     data_hoje = datetime.datetime.now().strftime("%Y-%m-%d")
     pasta_execucao = os.getcwd()
-    arquivo_saida = os.path.join(pasta_execucao, f"ANALISE_POSIÃ‡ÃƒO_{data_hoje}.xlsx")
+    arquivo_saida = os.path.join(pasta_execucao, f"ANALISE_POSICAO_{data_hoje}.xlsx")
 
     with pd.ExcelWriter(arquivo_saida, engine="openpyxl") as writer:
         df_filtrado.to_excel(writer, sheet_name="DIVERGENCIA DUPLICIDADE + GRADE", index=False)
@@ -120,18 +120,18 @@ def analisar_posicao():
         cell.font = Font(bold=True)
 
     wb.save(arquivo_saida)
-    messagebox.showinfo("Sucesso", f"Analise concluída! Planilha salva como {arquivo_saida}")
+    messagebox.showinfo("Sucesso", f"Análise concluída! Planilha salva como {arquivo_saida}")
 
 
 def realizar_15_30_60_puma():
     arquivo_entrada = "ORIGINAL.xlsx"
     if not os.path.exists(arquivo_entrada):
-        messagebox.showerror("Erro", "Arquivo ORIGINAL.xlsx nÃ£o encontrado!")
+        messagebox.showerror("Erro", "Arquivo ORIGINAL.xlsx não encontrado!")
         return
 
     try:
         # Carregar as abas
-        df_posicao = pd.read_excel(arquivo_entrada, sheet_name="POSIÃ‡ÃƒO 15.30.60", dtype=str)
+        df_posicao = pd.read_excel(arquivo_entrada, sheet_name="POSIÇÃO 15.30.60", dtype=str)
         df_base_cliente = pd.read_excel(arquivo_entrada, sheet_name="BASE CLIENTE", dtype=str)
 
         # Ajustar nomes das colunas para evitar erros de espaÃ§os extras
@@ -169,7 +169,7 @@ def realizar_15_30_60_puma():
             df_filtrado.columns[14],  # VALOR_R
         ]
 
-        # FunÃ§Ã£o para processar DataFrames e adicionar informaÃ§Ãµes da BASE CLIENTE
+        # FunÃ§Ã£o para processar DataFrames e adicionar informações da BASE CLIENTE
         def processa_df(df):
             if df.empty:
                 return pd.DataFrame(columns=colunas_selecionadas)
@@ -177,7 +177,7 @@ def realizar_15_30_60_puma():
             df_sel = df[["CLIFOR", "CLIENTE_ATACADO", "TIPO", "DOCUMENTO", df_filtrado.columns[15],
                          df_filtrado.columns[13], df_filtrado.columns[14]]].copy()
 
-            # Adicionar as informaÃ§Ãµes da BASE CLIENTE
+            # Adicionar as informações da BASE CLIENTE
             df_sel["MATRIZ"] = df_sel["CLIFOR"].map(lambda x: mapa_clientes.get(x, {}).get("MATRIZ", ""))
             df_sel["VENDEDOR"] = df_sel["CLIFOR"].map(lambda x: mapa_clientes.get(x, {}).get("VENDEDOR", ""))
             df_sel["CNPJ"] = df_sel["CLIFOR"].map(lambda x: mapa_clientes.get(x, {}).get("CNPJ", ""))
@@ -201,7 +201,7 @@ def realizar_15_30_60_puma():
                 "CNPJ": "first",
                 "TIPO": "first",
                 "DOCUMENTO": "first",
-                df_sel.columns[4]: "first",  # EmissÃ£o
+                df_sel.columns[4]: "first",  # Emissão
                 df_sel.columns[5]: "sum",    # QTDE_R
                 df_sel.columns[6]: "sum",    # VALOR_R
             })
@@ -213,7 +213,7 @@ def realizar_15_30_60_puma():
         df_30_final = processa_df(df_30)
         df_60_final = processa_df(df_60)
 
-        # Gerar arquivo Excel com os relatÃ³rios
+        # Gerar arquivo Excel com os relatórios
         data_hoje = datetime.datetime.today().strftime("%Y-%m-%d")
         arquivo_saida = f"15.30.60_Puma_{data_hoje}.xlsx"
         with pd.ExcelWriter(arquivo_saida, engine="openpyxl") as writer:
@@ -264,7 +264,7 @@ def analisar_carteira():
                 arquivo_entrada, sheet_name="ALTERAÇÃO DA DATA DE ENTREGA", header=0, dtype=str
             )
 
-            # Normalizar os cabeÃ§alhos para evitar erros de espaço ou maiÃºsculas
+            # Normalizar os cabeçalhos para evitar erros de espaço ou maiúsculas
             df_atual.columns = df_atual.columns.str.strip().str.upper()
             df_cancelados.columns = (
                 df_cancelados.columns.str.strip()
@@ -288,7 +288,7 @@ def analisar_carteira():
             ):
                 messagebox.showerror(
                     "Erro",
-                    f"Dados de 'CANCELAMENTO' ou 'PEDIDO' nÃ£o encontradas em {arquivo_entrada}.",
+                    f"Dados de 'CANCELAMENTO' ou 'PEDIDO' não encontradas em {arquivo_entrada}.",
                 )
                 return
 
@@ -439,7 +439,7 @@ def analisar_carteira():
                 "Erro", f"Ocorreu um erro na análise de alterações de datas: {e}"
             )
 
-        # Ajustar layout e formataÃ§Ã£o na aba "ALTERAÃ‡Ã•ES DE DATAS N REFL"
+        # Ajustar layout e formataÃ§Ã£o na aba "ALTERAÇÕES DE DATAS N REFL"
         try:
             wb = load_workbook(arquivo_saida)
             ws_alt = wb["ALTERAÇÕES DE DATAS N REFL"]
@@ -488,7 +488,7 @@ def analisar_carteira():
             idx_cliente = 1  # CLIENTE ATACADO (coluna B)
             idx_qtd = 17  # QTD (coluna R)
             idx_matriz = 32  # MATRIZ (da CARTEIRA ATUAL)
-            idx_data = 57  # DATA DE ALOCAÃ‡ÃƒO (coluna BF)
+            idx_data = 57  # DATA DE ALOCAÇÃO (coluna BF)
             idx_valor = 22  # VALOR (coluna W)
             idx_clifor = 31  # CLIFOR (coluna AF) â€“ somente da CARTEIRA ATUAL
 
@@ -637,7 +637,7 @@ progress_bar = ttk.Progressbar(
 )
 
 botao_analisar = tk.Button(
-    janela, text="Analisar PosiÃ§Ã£o", command=analisar_posicao, font=("Century Gothic", 12,"bold")
+    janela, text="Analisar Posição", command=analisar_posicao, font=("Century Gothic", 12, "bold")
 )
 botao_analisar.pack(pady=15)
 
