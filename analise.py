@@ -150,10 +150,10 @@ def realizar_15_30_60_puma():
 
         # Processar datas
         coluna_data = df_filtrado.columns[15]  # PosiÃ§Ã£o da coluna de data
-        df_filtrado["DATA_POS"] = pd.to_datetime(df_filtrado[coluna_data], errors="coerce", format="%Y-%m-%d %H:%M:%S")
+        df_filtrado["DATA_POS"] = pd.to_datetime(df_filtrado[coluna_data], errors="coerce", format="%d/%m/%Y %H:%M:%S")
         df_filtrado = df_filtrado.dropna(subset=["DATA_POS"])
 
-        hoje = pd.to_datetime(datetime.datetime.today().strftime("%Y-%m-%d"))
+        hoje = pd.to_datetime(datetime.datetime.today().strftime("%d/%m/%Y"))
         df_filtrado["DIFERENCA"] = (hoje - df_filtrado["DATA_POS"]).dt.days
 
         # Separar os grupos de 15, 30 e 60 dias
@@ -340,6 +340,9 @@ def analisar_carteira():
                 "ITEM",
             ]
             df_cancelados = df_cancelados[ordem_colunas]
+            df_cancelados["ENTREGA"] = pd.to_datetime(
+                                        df_cancelados["ENTREGA"], errors="coerce", dayfirst=True
+                                    ).dt.strftime('%d/%m/%Y')
             with pd.ExcelWriter(arquivo_saida, engine="openpyxl") as writer:
                 df_cancelados.to_excel(
                     writer, sheet_name="CANCELADOS AINDA EM CARTEIRA", index=False
@@ -406,10 +409,10 @@ def analisar_carteira():
 
             df_merged["DATA_ENTREGA_CORRETA"] = pd.to_datetime(
                 df_merged[col_entrega_correta], errors="coerce", dayfirst=True
-            )
+            ).dt.strftime('%d/%m/%Y')
             df_merged["DATA_ENTREGA_ATUAL"] = pd.to_datetime(
                 df_merged[col_entrega_atual], errors="coerce", dayfirst=True
-            )
+            ).dt.strftime('%d/%m/%Y')
             df_alteracoes = df_merged[
                 df_merged["DATA_ENTREGA_CORRETA"] != df_merged["DATA_ENTREGA_ATUAL"]
             ].copy()
@@ -419,11 +422,19 @@ def analisar_carteira():
                     "PEDIDO": df_alteracoes["PEDIDO"],
                     "PRODUTO": df_alteracoes["PRODUTO"],
                     "COR": df_alteracoes["COR"],
-                    "DATA ATUAL": df_alteracoes[col_entrega_atual],
+                    "DATA ATUAL":  pd.to_datetime(
+                                        df_alteracoes[col_entrega_atual], errors="coerce", dayfirst=True
+                                    ).dt.strftime('%d/%m/%Y %H:%M:%S'),
                     "ITEM": df_alteracoes["ITEM"],
-                    "ENTREGA": df_alteracoes[col_entrega_correta],
-                    "LIMITE ENTREGA": df_alteracoes["LIMITE DE ENTREGA"],
-                    "DATA ATUAL DA CARTEIRA": df_alteracoes[df_atual.columns[13]],
+                    "ENTREGA": pd.to_datetime(
+                                        df_alteracoes[col_entrega_correta], errors="coerce", dayfirst=True
+                                    ).dt.strftime('%d/%m/%Y %H:%M:%S'),
+                    "LIMITE ENTREGA": pd.to_datetime(
+                                        df_alteracoes["LIMITE DE ENTREGA"], errors="coerce", dayfirst=True
+                                    ).dt.strftime('%d/%m/%Y %H:%M:%S'),
+                    "DATA ATUAL DA CARTEIRA": pd.to_datetime(
+                                        df_alteracoes[df_atual.columns[13]], errors="coerce", dayfirst=True
+                                    ).dt.strftime('%d/%m/%Y %H:%M:%S'),
 
                     # TODO - nova coluna DATA ENTREGA ATUAL (data errada)
                 }
@@ -456,7 +467,7 @@ def analisar_carteira():
                 for cell in ws_alt[col]:
                     if cell.row > 1 and isinstance(cell.value, str):
                         try:
-                            cell.value = dt.strptime(cell.value.split()[0], "%Y-%m-%d")
+                            cell.value = dt.strptime(cell.value.split()[0], "%d/%m/%Y")
                         except:
                             pass
                     cell.number_format = "dd/mm/yyyy"
@@ -521,6 +532,7 @@ def analisar_carteira():
                         != df_merge[col_data_atu + "_atu"]
                     )
                 )
+                & (df_merge[['PRODUTO_ant', 'COR_ant']].astype(str).agg(''.join, axis=1) == df_merge[['PRODUTO_atu', 'COR_atu']].astype(str).agg(''.join, axis=1))
                 & (df_merge[col_data_ant + "_ant"].notna())
                 & (df_merge[col_data_ant + "_ant"] != "")
                 & (df_merge[col_data_atu + "_atu"].notna())
@@ -538,16 +550,107 @@ def analisar_carteira():
                     "PEDIDO": df_diff[col_pedido],
                     "CLIENTE ATACADO ATUAL": df_diff[col_cliente_atu + "_atu"],
                     "CLIENTE ATACADO ANTERIOR": df_diff[col_cliente_ant + "_ant"],
+                    "PRODUTO COR": df_diff["PROD_COR_atu"],
                     "CLIFOR": df_diff[col_clifor_final],
                     "MATRIZ": df_diff[col_matriz_atu + "_atu"],
                     "QTD ANTERIOR": df_diff[col_qtd_ant + "_ant"],
                     "QTD ATUAL": df_diff[col_qtd_atu + "_atu"],
-                    "DATA ALOCAÇÃO ANTERIOR": df_diff[col_data_ant + "_ant"],
-                    "DATA ALOCAÇÃO ATUAL": df_diff[col_data_atu + "_atu"],
+                    "DATA ALOCAÇÃO ANTERIOR": pd.to_datetime(df_diff[col_data_ant + "_ant"]).dt.strftime('%d/%m/%Y'),
+                    "DATA ALOCAÇÃO ATUAL": pd.to_datetime(df_diff[col_data_atu + "_atu"]).dt.strftime('%d/%m/%Y'),
                     "VALOR ATUAL": df_diff[col_valor_atu + "_atu"],
                     "VALOR ANTERIOR": df_diff[col_valor_ant + "_ant"],
                 }
             )
+
+
+            print("inicio")
+            df_pedidos_nao_encontrados = df_anterior[
+                ~df_anterior['PEDIDO'].isin(df_atual['PEDIDO'].to_list())
+            ]
+
+            df_pedido_posicao_dia = pd.read_excel(
+                arquivo_entrada, sheet_name="POSIÇÃO DO DIA", header=0, dtype=str
+            )
+
+            df_pedido_posicao_dia.columns = (
+                df_pedido_posicao_dia.columns.str.strip()
+                .str.upper()
+                .str.normalize("NFKD")
+                .str.encode("ascii", errors="ignore")
+                .str.decode("utf-8")
+            )
+
+            df_pedidos_encontrados_por_numero = pd.merge(
+                df_pedidos_nao_encontrados,
+                df_pedido_posicao_dia,
+                on=col_pedido,
+                how="inner",
+                suffixes=("_ant", "_atu"),
+            )
+
+            if not df_pedidos_encontrados_por_numero.empty:
+                df_pedidos_encontrados_por_numero = df_pedidos_encontrados_por_numero[
+                    (df_pedidos_encontrados_por_numero[['PRODUTO_ant', 'COR']].astype(str).agg(''.join, axis=1) == df_pedidos_encontrados_por_numero[['PRODUTO_atu', 'COR_PRODUTO']].astype(str).agg(''.join, axis=1))
+                ]
+
+            df_pedidos_nao_encontrados_por_numero = df_pedidos_nao_encontrados[
+                ~(df_pedidos_nao_encontrados["PEDIDO"].isin(df_pedidos_encontrados_por_numero["PEDIDO"].to_list()))
+            ]
+
+            df_pedidos_encontrados_por_clifor = pd.merge(
+                df_pedidos_nao_encontrados,
+                df_pedido_posicao_dia,
+                on=col_clifor,
+                how="inner",
+                suffixes=("_ant", "_atu"),
+            )
+
+            if not df_pedidos_encontrados_por_numero.empty:
+                df_pedidos_encontrados_por_clifor = df_pedidos_encontrados_por_clifor[
+                    (df_pedidos_encontrados_por_clifor[['PRODUTO_ant', 'COR']].astype(str).agg(''.join, axis=1) == df_pedidos_encontrados_por_clifor[['PRODUTO_atu', 'COR_PRODUTO']].astype(str).agg(''.join, axis=1))
+                ]
+
+            df_pedidos_nao_encontrados_por_clifor = df_pedidos_nao_encontrados[
+                ~(df_pedidos_nao_encontrados["PEDIDO"].isin(df_pedidos_encontrados_por_clifor["PEDIDO_ant"].to_list()))
+            ]
+           
+            df_nao_encontrado = pd.DataFrame(
+                {
+                    "STTS": "PEDIDO NAO ENCONTRADO",
+                    "PEDIDO": df_pedidos_nao_encontrados_por_numero[col_pedido],
+                    "CLIENTE ATACADO ATUAL": None,
+                    "CLIENTE ATACADO ANTERIOR": df_pedidos_nao_encontrados_por_numero[col_cliente_ant],
+                    "PRODUTO COR": df_pedidos_nao_encontrados_por_numero["PROD_COR"],
+                    "CLIFOR": df_pedidos_nao_encontrados_por_numero['CLIFOR'],
+                    "MATRIZ": df_pedidos_nao_encontrados_por_numero[col_matriz_atu],
+                    "QTD ANTERIOR": df_pedidos_nao_encontrados_por_numero[col_qtd_ant],
+                    "QTD ATUAL": None,
+                    "DATA ALOCAÇÃO ANTERIOR": pd.to_datetime(df_pedidos_nao_encontrados_por_numero[col_data_ant]).dt.strftime('%d/%m/%Y'),
+                    "DATA ALOCAÇÃO ATUAL": None,
+                    "VALOR ATUAL": None,
+                    "VALOR ANTERIOR": df_pedidos_nao_encontrados_por_numero[col_valor_ant],
+                }
+            )
+
+            df_nao_encontrado_clifor = pd.DataFrame(
+                {
+                    "STTS": "PEDIDO NAO ENCONTRADO",
+                    "PEDIDO": df_pedidos_nao_encontrados_por_clifor[col_pedido],
+                    "CLIENTE ATACADO ATUAL": None,
+                    "CLIENTE ATACADO ANTERIOR": df_pedidos_nao_encontrados_por_clifor[col_cliente_ant],
+                    "PRODUTO COR": df_pedidos_nao_encontrados_por_clifor["PROD_COR"],
+                    "CLIFOR": df_pedidos_nao_encontrados_por_clifor['CLIFOR'],
+                    "MATRIZ": df_pedidos_nao_encontrados_por_clifor[col_matriz_atu],
+                    "QTD ANTERIOR": df_pedidos_nao_encontrados_por_clifor[col_qtd_ant],
+                    "QTD ATUAL": None,
+                    "DATA ALOCAÇÃO ANTERIOR": pd.to_datetime(df_pedidos_nao_encontrados_por_clifor[col_data_ant]).dt.strftime('%d/%m/%Y'),
+                    "DATA ALOCAÇÃO ATUAL": None,
+                    "VALOR ATUAL": None,
+                    "VALOR ANTERIOR": df_pedidos_nao_encontrados_por_clifor[col_valor_ant],
+                }
+            )
+
+            df_nao_encontrado_final = pd.concat([df_nao_encontrado, df_nao_encontrado_clifor]).drop_duplicates()
 
             def stts(row):
                 alterations = []
@@ -558,6 +661,9 @@ def analisar_carteira():
                 return " + ".join(alterations)
 
             df_comp_final.insert(0, "STTS", df_comp_final.apply(stts, axis=1))
+
+            df_comp_final = pd.concat([df_comp_final, df_nao_encontrado_final])
+
             with pd.ExcelWriter(arquivo_saida, engine="openpyxl", mode="a") as writer:
                 df_comp_final.to_excel(
                     writer, sheet_name="COMPARATIVO DE ALOCAÇÃO", index=False
@@ -595,7 +701,7 @@ def analisar_carteira():
                 for cell in row:
                     try:
                         if isinstance(cell.value, str):
-                            cell.value = dt.strptime(cell.value.split()[0], "%Y-%m-%d")
+                            cell.value = dt.strptime(cell.value.split()[0], "%d/%m/%Y")
                         cell.number_format = "dd/mm/yyyy"
                     except Exception:
                         pass
@@ -616,6 +722,55 @@ def analisar_carteira():
         progress_bar.stop()
         progress_bar.pack_forget()
         botao_analise_carteira.config(state="normal")
+
+        # ================================
+        # Nova funcionalidade: STATUS_PEDIDO bloqueios indevidos 
+        # ================================
+        try:
+            df_contas_a_pagar = pd.read_excel(
+                arquivo_entrada, sheet_name="CONTAS A PAGAR", header=0, dtype=str
+            )
+
+            df_bloqueados = df_atual[df_atual["STATUS_PEDIDO"] == "BLOQUEADO"]
+
+            if df_bloqueados.empty:
+                messagebox.showinfo(
+                    "Resultado", "Nenhum bloqueio encontrado na carteira atual!"
+                )
+                return
+
+            df_contas_a_pagar["DIAS_ATRASADO"] = pd.to_numeric(df_contas_a_pagar["DIAS_ATRASADO"], errors="coerce")
+
+            df_merge =  pd.merge(
+                df_bloqueados,
+                df_contas_a_pagar,
+                on="MATRIZ_CLIENTE",
+                how="inner",
+                suffixes=("", "_pagar"),
+            )
+
+            df_merge["MAX_ATRASO"] = df_merge.groupby("MATRIZ_CLIENTE")["DIAS_ATRASADO"].transform("max")
+
+            df_indevidos = df_merge[df_merge["MAX_ATRASO"] < 0]
+
+            df_alteracoes_final = pd.DataFrame(
+                {
+                   "CLIFOR": df_indevidos["CLIFOR"].str.rstrip(),
+                   "CLIENTE_ATACADO": df_indevidos["CLIENTE_ATACADO"].str.rstrip(),
+                   "MATRIZ": df_indevidos["MATRIZ_CLIENTE"].str.rstrip()
+                }
+            ).drop_duplicates()
+            with pd.ExcelWriter(arquivo_saida, engine="openpyxl", mode="a") as writer:
+                df_alteracoes_final.to_excel(
+                    writer, sheet_name="BLOQUEIO INDEVIDO", index=False
+                )
+        except Exception as e:
+            progress_bar.stop()
+            progress_bar.pack_forget()
+            print(e)
+            messagebox.showerror(
+                "Erro", f"Ocorreu um erro na análise de alterações de datas: {e}"
+            )
 
         messagebox.showinfo(
             "Sucesso",
