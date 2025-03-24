@@ -4,10 +4,14 @@ import threading
 import tkinter as tk
 from tkinter import messagebox, ttk
 import pandas as pd
-from openpyxl import load_workbook
+from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+
+class ExceptionFile(Exception):
+    def __init__(self, *args):
+        super().__init__(*args)
 
 def analisar_posicao():
     arquivo_entrada = "ORIGINAL.xlsx"
@@ -150,10 +154,10 @@ def realizar_15_30_60_puma():
 
         # Processar datas
         coluna_data = df_filtrado.columns[15]  # PosiÃ§Ã£o da coluna de data
-        df_filtrado["DATA_POS"] = pd.to_datetime(df_filtrado[coluna_data], errors="coerce", format="%d/%m/%Y %H:%M:%S")
+        df_filtrado["DATA_POS"] = pd.to_datetime(df_filtrado[coluna_data], errors="coerce", format="%Y-%m-%d %H:%M:%S")
         df_filtrado = df_filtrado.dropna(subset=["DATA_POS"])
 
-        hoje = pd.to_datetime(datetime.datetime.today().strftime("%d/%m/%Y"))
+        hoje = pd.to_datetime(datetime.datetime.today().strftime("%Y-%m-%d"))
         df_filtrado["DIFERENCA"] = (hoje - df_filtrado["DATA_POS"]).dt.days
 
         # Separar os grupos de 15, 30 e 60 dias
@@ -246,6 +250,15 @@ def analisar_carteira():
         progress_bar.pack(pady=20)
         progress_bar.start()
 
+        data_hoje = datetime.datetime.now().strftime("%Y-%m-%d")
+        pasta_execucao = os.getcwd()
+        arquivo_saida = os.path.join(
+            pasta_execucao, f"ANALISE_CARTEIRA_{data_hoje}.xlsx"
+        )
+        
+        wb = Workbook()
+        wb.save(arquivo_saida)
+        
         arquivo_entrada = "ORIGINAL.xlsx"
         if not os.path.exists(arquivo_entrada):
             messagebox.showerror("Erro", "Arquivo ORIGINAL.xlsx não encontrado!")
@@ -286,11 +299,7 @@ def analisar_carteira():
                 df_cancelados.shape[1] < 2
                 or df_alteracoes.shape[1] < 2
             ):
-                messagebox.showerror(
-                    "Erro",
-                    f"Dados de 'CANCELAMENTO' ou 'PEDIDO' não encontradas em {arquivo_entrada}.",
-                )
-                return
+                raise ExceptionFile()
 
             # Filtrar pedidos para cancelar
             pedidos_cancelados = df_cancelados["PEDIDO"].str.cat(
@@ -309,10 +318,7 @@ def analisar_carteira():
                             ]
 
             if pedidos_na_carteira.empty:
-                messagebox.showinfo(
-                    "Resultado", "Nenhum pedido cancelado encontrado na carteira atual!"
-                )
-                return
+                raise ExceptionFile()
 
             # Selecionar as colunas conforme os í­ndices informados
             colunas_indices = {
@@ -326,9 +332,6 @@ def analisar_carteira():
             # Salvar a planilha de análise dos cancelados
             data_hoje = datetime.datetime.now().strftime("%Y-%m-%d")
             pasta_execucao = os.getcwd()
-            arquivo_saida = os.path.join(
-                pasta_execucao, f"ANALISE_CARTEIRA_{data_hoje}.xlsx"
-            )
             df_cancelados = pedidos_na_carteira[list(colunas_indices.values())]
             df_cancelados.columns = colunas_indices.keys()
             ordem_colunas = [
@@ -373,6 +376,9 @@ def analisar_carteira():
                         max_length = max(max_length, len(str(cell.value)))
                 ws.column_dimensions[col_letter].width = max_length + 2
             wb.save(arquivo_saida)
+
+        except ExceptionFile as e:
+            print("Pulando analise")
 
         except Exception as e:
             progress_bar.stop()
@@ -430,7 +436,7 @@ def analisar_carteira():
                                         df_alteracoes[col_entrega_correta], errors="coerce", dayfirst=True
                                     ).dt.strftime('%d/%m/%Y %H:%M:%S'),
                     "LIMITE ENTREGA": pd.to_datetime(
-                                        df_alteracoes["LIMITE DE ENTREGA"], errors="coerce", dayfirst=True
+                                        df_alteracoes["LIMITE DE ENTREGA"], errors="coerce", dayfirst=False
                                     ).dt.strftime('%d/%m/%Y %H:%M:%S'),
                     "DATA ATUAL DA CARTEIRA": pd.to_datetime(
                                         df_alteracoes[df_atual.columns[13]], errors="coerce", dayfirst=True
@@ -719,9 +725,6 @@ def analisar_carteira():
             messagebox.showerror(
                 "Erro", f"Ocorreu um erro ao formatar o comparativo de alocação: {e}"
             )
-        progress_bar.stop()
-        progress_bar.pack_forget()
-        botao_analise_carteira.config(state="normal")
 
         # ================================
         # Nova funcionalidade: STATUS_PEDIDO bloqueios indevidos 
@@ -772,6 +775,9 @@ def analisar_carteira():
                 "Erro", f"Ocorreu um erro na análise de alterações de datas: {e}"
             )
 
+        progress_bar.stop()
+        progress_bar.pack_forget()
+        botao_analise_carteira.config(state="normal")
         messagebox.showinfo(
             "Sucesso",
             f"Analise de carteira concluída! Planilha salva como {arquivo_saida}",
